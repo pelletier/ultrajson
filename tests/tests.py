@@ -263,6 +263,12 @@ class UltraJSONTests(TestCase):
         self.assertEquals(expected, output)
         pass
 
+    def test_dateTimesdontFuckWithStrings(self):
+        string = "total_size_in_bytes" # yeah, 19 chars.
+        result = ujson.encode(string)
+        self.assertEqual('"total_size_in_bytes"', result)
+        self.assertEqual(string, ujson.decode(result))
+
     def test_encodeDecimal(self):
         from decimal import Decimal
         res = Decimal(1) / Decimal(7)

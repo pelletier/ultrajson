@@ -90,6 +90,7 @@ JSOBJ Object_newDateTime(struct DecoderState *ds, wchar_t *end, int size)
     }
     else
     {
+        PyErr_Clear();
         return ds->dec->newString(start, end);
     }
 }
