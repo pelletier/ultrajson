@@ -38,16 +38,6 @@ Copyright (c) 2007  Nick Galbreath -- nickg [at] modp [dot] com. All rights rese
 #include <limits.h>
 #include <wchar.h>
 
-struct DecoderState
-{
-    char *start;
-    char *end;
-    wchar_t *escStart;
-    wchar_t *escEnd;
-    int escHeap;
-    int lastType;
-    JSONObjectDecoder *dec;
-};
 
 JSOBJ FASTCALL_MSVC decode_any( struct DecoderState *ds) FASTCALL_ATTR;
 typedef JSOBJ (*PFN_DECODER)( struct DecoderState *ds);
@@ -451,7 +441,18 @@ FASTCALL_ATTR JSOBJ FASTCALL_MSVC decode_string ( struct DecoderState *ds)
             ds->lastType = JT_UTF8;
             inputOffset ++;
             ds->start += ( (char *) inputOffset - (ds->start));
-            RETURN_JSOBJ_NULLCHECK(ds->dec->newString(ds->escStart, escOffset));
+
+            int str_size = (escOffset - ds->escStart);
+
+
+            if ( str_size == 19 || str_size == 26 )
+            {
+                RETURN_JSOBJ_NULLCHECK(ds->dec->newDateTime(ds, escOffset, str_size));
+            }
+            else
+            {
+                RETURN_JSOBJ_NULLCHECK(ds->dec->newString(ds->escStart, escOffset));
+            }
 
         case DS_UTFLENERROR:
             return SetError (ds, -1, "Invalid UTF-8 sequence length when decoding 'string'");
@@ -479,7 +480,7 @@ FASTCALL_ATTR JSOBJ FASTCALL_MSVC decode_string ( struct DecoderState *ds)
                         switch (*inputOffset)
                         {
                         case '\0':  return SetError (ds, -1, "Unterminated unicode escape sequence when decoding 'string'");
-                        default:        return SetError (ds, -1, "Unexpected character in unicode escape sequence when decoding 'string'");
+                        default:    return SetError (ds, -1, "Unexpected character in unicode escape sequence when decoding 'string'");
 
                         case '0':
                         case '1':
@@ -780,7 +781,7 @@ FASTCALL_ATTR JSOBJ FASTCALL_MSVC decode_any(struct DecoderState *ds)
             case '-': 
                 return decode_numeric (ds);
 
-            case '[':   return decode_array (ds);
+            case '[': return decode_array (ds);
             case '{': return decode_object (ds);
             case 't': return decode_true (ds);
             case 'f': return decode_false (ds);

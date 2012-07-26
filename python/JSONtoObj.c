@@ -57,6 +57,43 @@ JSOBJ Object_newString(wchar_t *start, wchar_t *end)
     return PyUnicode_FromWideChar (start, (end - start));
 }
 
+JSOBJ Object_newDateTime(struct DecoderState *ds, wchar_t *end, int size)
+{
+    wchar_t *start = ds->escStart;
+    PyObject *str, *date, *mod_datetime, *type_datetime;
+    str = PyUnicode_FromWideChar(start, (end - start));
+
+    mod_datetime = PyImport_ImportModule("datetime");
+    type_datetime = PyObject_GetAttrString(mod_datetime, "datetime");
+
+    char *format_string = NULL;
+
+    if (size == 19)
+    {
+        format_string = "%Y-%m-%dT%H:%M:%S";
+    }
+    else
+    {
+        format_string = "%Y-%m-%dT%H:%M:%S.%f";
+    }
+
+    date = PyObject_CallMethod(type_datetime, "strptime", "(Os)", str, format_string);
+
+    Py_DECREF(str);
+    Py_DECREF(mod_datetime);
+    Py_DECREF(type_datetime);
+
+    PyObject *err = PyErr_Occurred();
+    if (err == NULL)
+    {
+        return date;
+    }
+    else
+    {
+        return ds->dec->newString(start, end);
+    }
+}
+
 JSOBJ Object_newTrue(void)
 { 
     Py_RETURN_TRUE;
@@ -111,6 +148,7 @@ PyObject* JSONToObj(PyObject* self, PyObject *arg)
     JSONObjectDecoder decoder = 
     {
         Object_newString,
+        Object_newDateTime,
         Object_objectAddKey,
         Object_arrayAddItem,
         Object_newTrue,

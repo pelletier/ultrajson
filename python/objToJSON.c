@@ -38,6 +38,8 @@ Copyright (c) 2007  Nick Galbreath -- nickg [at] modp [dot] com. All rights rese
 
 #define EPOCH_ORD 719163
 
+static PyObject* type_decimal;
+
 typedef void *(*PFN_PyTypeToJSON)(JSOBJ obj, JSONTypeContext *ti, void *outValue, size_t *_outLen);
 
 
@@ -81,6 +83,11 @@ struct PyDictIterState
 
 void initObjToJSON(void)
 {
+    PyObject* mod_decimal = PyImport_ImportModule("decimal");
+    type_decimal = PyObject_GetAttrString(mod_decimal, "Decimal");
+    Py_INCREF(type_decimal);
+    Py_DECREF(mod_decimal);
+
     PyDateTime_IMPORT;
 }
 
@@ -111,6 +118,20 @@ static void *PyFloatToDOUBLE(JSOBJ _obj, JSONTypeContext *tc, void *outValue, si
     return NULL;
 }
 
+static void *PyDecimalToDOUBLE(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
+{
+    PyObject *obj = (PyObject *) _obj;
+    PyObject *string_repr, *float_repr;
+    string_repr = PyObject_Str(obj);
+    float_repr = PyFloat_FromString(string_repr, NULL);
+
+    *((double *) outValue) = PyFloat_AS_DOUBLE (float_repr);
+
+    Py_DECREF(float_repr);
+
+    return NULL;
+}
+
 static void *PyStringToUTF8(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
 {
     PyObject *obj = (PyObject *) _obj;
@@ -129,46 +150,40 @@ static void *PyUnicodeToUTF8(JSOBJ _obj, JSONTypeContext *tc, void *outValue, si
     return PyString_AS_STRING(newObj);
 }
 
-static void *PyDateTimeToINT64(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
+static void *PyDateTimeToESString(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
 {
     PyObject *obj = (PyObject *) _obj;
-    PyObject *date, *ord;
-    int y, m, d, h, mn, s, days;
+    PyObject *isodatestring;
 
-    y = PyDateTime_GET_YEAR(obj);
-    m = PyDateTime_GET_MONTH(obj);
-    d = PyDateTime_GET_DAY(obj);
-    h = PyDateTime_DATE_GET_HOUR(obj);
-    mn = PyDateTime_DATE_GET_MINUTE(obj);
-    s = PyDateTime_DATE_GET_SECOND(obj);
+    isodatestring = PyObject_CallMethod(obj, "isoformat", NULL);
+    outValue = PyString_AS_STRING(isodatestring);
+    *_outLen = PyString_GET_SIZE(isodatestring);
 
-    date = PyDate_FromDate(y, m, 1);
-    ord = PyObject_CallMethod(date, "toordinal", NULL);
-    days = PyInt_AS_LONG(ord) - EPOCH_ORD + d - 1;
-    Py_DECREF(date);
-    Py_DECREF(ord);
-    *( (JSINT64 *) outValue) = (((JSINT64) ((days * 24 + h) * 60 + mn)) * 60 + s);
-    return NULL;
+    Py_DECREF(isodatestring);
+
+    return outValue;
 }
 
-static void *PyDateToINT64(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
+static void *PyDateToESString(JSOBJ _obj, JSONTypeContext *tc, void *outValue, size_t *_outLen)
 {
     PyObject *obj = (PyObject *) _obj;
-    PyObject *date, *ord;
-    int y, m, d, days;
+    PyObject *date, *isodatestring;
+
+    int y, m, d;
 
     y = PyDateTime_GET_YEAR(obj);
     m = PyDateTime_GET_MONTH(obj);
     d = PyDateTime_GET_DAY(obj);
 
-    date = PyDate_FromDate(y, m, 1);
-    ord = PyObject_CallMethod(date, "toordinal", NULL);
-    days = PyInt_AS_LONG(ord) - EPOCH_ORD + d - 1;
-    Py_DECREF(date);
-    Py_DECREF(ord);
-    *( (JSINT64 *) outValue) = ((JSINT64) days * 86400);
+    date = PyDateTime_FromDateAndTime(y, m, d, 0, 0, 0, 0);
+    isodatestring = PyObject_CallMethod(date, "isoformat", NULL);
+    outValue = PyString_AS_STRING(isodatestring);
+    *_outLen = PyString_GET_SIZE(isodatestring);
 
-    return NULL;
+    Py_DECREF(date);
+    Py_DECREF(isodatestring);
+
+    return outValue;
 }
 
 //=============================================================================
@@ -491,6 +506,13 @@ void Object_beginTypeContext (JSOBJ _obj, JSONTypeContext *tc)
         return;
     }
     else
+    if (PyObject_IsInstance(obj, type_decimal))
+    {
+        PRINTMARK();
+        pc->PyTypeToJSON = PyDecimalToDOUBLE; tc->type = JT_DOUBLE;
+        return;
+    }
+    else
     if (PyLong_Check(obj))
     {
         PRINTMARK();
@@ -544,14 +566,14 @@ void Object_beginTypeContext (JSOBJ _obj, JSONTypeContext *tc)
     if (PyDateTime_Check(obj))
     {
         PRINTMARK();
-        pc->PyTypeToJSON = PyDateTimeToINT64; tc->type = JT_LONG;
+        pc->PyTypeToJSON = PyDateTimeToESString; tc->type = JT_UTF8;
         return;
     }
     else 
     if (PyDate_Check(obj))
     {
         PRINTMARK();
-        pc->PyTypeToJSON = PyDateToINT64; tc->type = JT_LONG;
+        pc->PyTypeToJSON = PyDateToESString; tc->type = JT_UTF8;
         return;
     }
     else

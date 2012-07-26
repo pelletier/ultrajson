@@ -129,15 +129,15 @@ typedef int64_t JSLONG;
 enum JSTYPES
 {
     JT_NULL,        // NULL
-    JT_TRUE,        //boolean true
-    JT_FALSE,       //boolean false
-    JT_INT,         //(JSINT32 (signed 32-bit))
-    JT_LONG,        //(JSINT64 (signed 64-bit))
-    JT_DOUBLE,  //(double)
-    JT_UTF8,        //(char 8-bit)
+    JT_TRUE,        // boolean true
+    JT_FALSE,       // boolean false
+    JT_INT,         // (JSINT32 (signed 32-bit))
+    JT_LONG,        // (JSINT64 (signed 64-bit))
+    JT_DOUBLE,      // (double)
+    JT_UTF8,        // (char 8-bit)
     JT_ARRAY,       // Array structure
-    JT_OBJECT,  // Key/Value structure 
-    JT_INVALID, // Internal, do not return nor expect
+    JT_OBJECT,      // Key/Value structure 
+    JT_INVALID,     // Internal, do not return nor expect
 };
 
 typedef void * JSOBJ;
@@ -265,6 +265,7 @@ EXPORTFUNCTION char *JSON_EncodeObject(JSOBJ obj, JSONObjectEncoder *enc, char *
 typedef struct __JSONObjectDecoder
 {
     JSOBJ (*newString)(wchar_t *start, wchar_t *end);
+    JSOBJ (*newDateTime)(wchar_t *start, wchar_t *end, int size);
     void (*objectAddKey)(JSOBJ obj, JSOBJ name, JSOBJ value);
     void (*arrayAddItem)(JSOBJ obj, JSOBJ value);
     JSOBJ (*newTrue)(void);
@@ -289,4 +290,15 @@ typedef struct __JSONObjectDecoder
 
 EXPORTFUNCTION JSOBJ JSON_DecodeObject(JSONObjectDecoder *dec, const char *buffer, size_t cbBuffer);
 
+
+struct DecoderState
+{
+    char *start;
+    char *end;
+    wchar_t *escStart;
+    wchar_t *escEnd;
+    int escHeap;
+    int lastType;
+    JSONObjectDecoder *dec;
+};
 #endif

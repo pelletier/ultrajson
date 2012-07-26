@@ -246,9 +246,9 @@ class UltraJSONTests(TestCase):
         ts = time.time()
         input = datetime.datetime.fromtimestamp(ts)
         output = ujson.encode(input)
-        expected = calendar.timegm(input.utctimetuple())
-        self.assertEquals(int(expected), json.loads(output))
-        self.assertEquals(int(expected), ujson.decode(output))
+        expected = "\"%s\"" % input.isoformat()
+        self.assertEquals(input, ujson.decode(output))
+        self.assertEquals(expected, output)
         pass
 
     def test_encodeDateConversion(self):
@@ -256,12 +256,18 @@ class UltraJSONTests(TestCase):
         input = datetime.date.fromtimestamp(ts)
 
         output = ujson.encode(input)
-        tup = ( input.year, input.month, input.day, 0, 0, 0 )
 
-        expected = calendar.timegm(tup)
-        self.assertEquals(int(expected), json.loads(output))
-        self.assertEquals(int(expected), ujson.decode(output))
+        dt = datetime.datetime(input.year, input.month, input.day, 0, 0, 0)
+        expected = "\"%s\"" % dt.isoformat()
+        self.assertEquals(dt, ujson.decode(output))
+        self.assertEquals(expected, output)
         pass
+
+    def test_encodeDecimal(self):
+        from decimal import Decimal
+        res = Decimal(1) / Decimal(7)
+        output = ujson.encode(res)
+        self.assertEquals('0.14286', output)
 
     def test_encodeToUTF8(self):
         input = "\xe6\x97\xa5\xd1\x88"
